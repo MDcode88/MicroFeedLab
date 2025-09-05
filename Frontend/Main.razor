@@ -1,0 +1,194 @@
+@page "/"
+@inject IJSRuntime JSRuntime
+@using System.Net.Http.Headers
+@using System.Net.Http.Json
+
+<h1>MicroFeed</h1>
+
+@if (isInitializing)
+{
+    <p><em>Caricamento...</em></p>
+}
+else if (isLoggedIn)
+{
+    <div>
+        <p>Benvenuto! <button class="btn btn-sm btn-danger" @onclick="HandleSignOut">Logout</button></p>
+        <hr />
+        <ProfileSection />
+        <hr />
+        <CreatePostSection />
+        <hr />
+        <FeedSection />
+    </div>
+}
+else
+{
+    <LoginSection />
+}
+
+@code {
+    // TODO: GRUPPO 4 - Questo file contiene tutta la logica del frontend.
+    // Il vostro compito è analizzarlo, completare le parti mancanti e potenzialmente
+    // suddividerlo in componenti Razor separati se il tempo lo permette.
+
+    private bool isInitializing = true;
+    private bool isLoggedIn = false;
+
+    // --- SEZIONE LOGIN ---
+    private string loginEmail = "";
+    private string loginPassword = "";
+    private string loginError = "";
+
+    // --- SEZIONE PROFILO ---
+    private string profileUsername = "";
+    private string profileBio = "";
+    private string profileMessage = "";
+
+    // --- SEZIONE POST ---
+    private string newPostContent = "";
+    private string postMessage = "";
+
+    // --- SEZIONE FEED ---
+    private List<FeedItem> feedItems = new();
+    private string feedError = "";
+
+    // Modelli di dati
+    public record UserProfile(string Username, string Bio);
+    public record NewPostRequest(string Content);
+    public record FeedItem(string PostId, string Content, string AuthorId, string AuthorUsername);
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var initialized = await JSRuntime.InvokeAsync<bool>("initializeFirebase");
+            if (initialized)
+            {
+                var token = await JSRuntime.InvokeAsync<string>("getJwtToken");
+                isLoggedIn = !string.IsNullOrEmpty(token);
+            }
+            isInitializing = false;
+            StateHasChanged();
+        }
+    }
+
+    private async Task HandleSignUp()
+    {
+        var result = await JSRuntime.InvokeAsync<LoginResult>("signUp", loginEmail, loginPassword);
+        if (result.success)
+        {
+            await HandleSignIn();
+        }
+        else
+        {
+            loginError = result.message;
+        }
+    }
+
+    private async Task HandleSignIn()
+    {
+        var result = await JSRuntime.InvokeAsync<LoginResult>("signIn", loginEmail, loginPassword);
+        if (result.success)
+        {
+            isLoggedIn = true;
+            loginError = "";
+            await LoadFeed(); // Carica il feed dopo il login
+        }
+        else
+        {
+            isLoggedIn = false;
+            loginError = result.message;
+        }
+    }
+
+    private async Task HandleSignOut()
+    {
+        await JSRuntime.InvokeVoidAsync("signOut");
+        isLoggedIn = false;
+    }
+
+    // TODO: GRUPPO 4 - Implementare i metodi per interagire con le API backend
+    private async Task LoadProfile()
+    {
+        // 1. Ottenere il token con `getJwtToken`
+        // 2. Creare un HttpClient, aggiungere il token come header `Authorization: Bearer <token>`
+        // 3. Fare una chiamata GET a `/api/users/me` del UserService
+        // 4. Popolare `profileUsername` e `profileBio` con la risposta
+        profileMessage = "TODO: Caricare il profilo utente da UserService";
+    }
+
+    private async Task SaveProfile()
+    {
+        // 1. Ottenere il token
+        // 2. Creare HttpClient con token
+        // 3. Fare una chiamata POST a `/api/users/me` con un oggetto UserProfile
+        profileMessage = "TODO: Salvare il profilo utente su UserService";
+    }
+
+    private async Task CreatePost()
+    {
+        // Logica simile a SaveProfile, ma chiamata POST a `/api/posts` del PostService
+        postMessage = "TODO: Creare un nuovo post chiamando PostService";
+    }
+
+    private async Task LoadFeed()
+    {
+        // Logica simile, ma chiamata GET a `/api/feed` del FeedService
+        feedError = "TODO: Caricare il feed da FeedService";
+    }
+
+    // --- Render Fragments per dividere visivamente il codice ---
+
+    RenderFragment LoginSection =>@<div class="card p-3">
+    <h3>Login / Registrazione</h3>
+    <input class="form-control mb-2" @bind="loginEmail" placeholder="Email" />
+    <input type="password" class="form-control mb-2" @bind="loginPassword" placeholder="Password" />
+    <button class="btn btn-primary" @onclick="HandleSignIn">Login</button>
+    <button class="btn btn-secondary mt-2" @onclick="HandleSignUp">Registrati</button>
+@if (!string.IsNullOrEmpty(loginError)) {
+    <p class="text-danger mt-2">@loginError</p>
+    }
+</div>;
+
+RenderFragment ProfileSection =>@<div class="card p-3 mb-3">
+    <h4>Il mio profilo</h4>
+    <input class="form-control mb-2" @bind="profileUsername" placeholder="Username" />
+<textarea class="form-control mb-2" @bind="profileBio" placeholder="La tua bio"></textarea>
+    <button class="btn btn-info" @onclick="SaveProfile">Salva Profilo</button>
+    <button class="btn btn-light mt-2" @onclick="LoadProfile">Carica Profilo</button>
+@if(!string.IsNullOrEmpty(profileMessage)) {
+    <p class="text-success mt-2">@profileMessage</p>
+    }
+</div>;
+
+RenderFragment CreatePostSection =>@<div class="card p-3 mb-3">
+    <h4>Nuovo Post</h4>
+<textarea class="form-control mb-2" @bind="newPostContent" placeholder="A cosa stai pensando?"></textarea>
+    <button class="btn btn-success" @onclick="CreatePost">Pubblica</button>
+@if(!string.IsNullOrEmpty(postMessage)) {
+    <p class="text-success mt-2">@postMessage</p>
+    }
+</div>;
+
+RenderFragment FeedSection =>@<div class="card p-3">
+    <h4>Feed Principale</h4>
+@if(!string.IsNullOrEmpty(feedError)) {
+    <p class="text-danger">@feedError</p>
+    }
+@foreach(var item in feedItems)
+    {
+    <div class="border p-2 my-2">
+        <strong>@@@item.AuthorUsername</strong>
+        <p>@item.Content</p>
+    </div>
+    }
+</div>;
+
+public class LoginResult
+    {
+        public bool success { get; set; }
+        public string? userId { get; set; }
+        public string? message { get; set; }
+    }
+}

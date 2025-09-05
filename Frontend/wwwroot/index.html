@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>MicroFeed</title>
+    <base href="/" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">Loading...</div>
+
+    <!-- 
+      GRUPPO 4: Incollate qui la configurazione della vostra Web App Firebase.
+      La trovate nelle Impostazioni Progetto della console Firebase.
+    -->
+    <script>
+      const firebaseConfig = {
+        apiKey: "",
+        authDomain: "",
+        projectId: "",
+        storageBucket: "",
+        messagingSenderId: "",
+        appId: ""
+      };
+    </script>
+
+    <!-- SDK di Firebase (versioni di compatibilità per usare la sintassi v8 con il file firebase.js) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    
+    <!-- Nostro file per l'interoperabilità JS <-> Blazor -->
+    <script src="js/firebase.js"></script>
+    
+    <!-- Framework Blazor -->
+    <script src="_framework/blazor.webassembly.js"></script>
+</body>
+</html>
+
