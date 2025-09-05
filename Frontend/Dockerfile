@@ -7,6 +7,7 @@ COPY . .
 RUN dotnet publish -c Release -o /app/publish
 
 # Fase 2: Server Nginx per servire i file statici
+
 FROM nginx:alpine AS final
 WORKDIR /usr/share/nginx/html
 # Rimuovi il contenuto di default
