@@ -73,7 +73,7 @@ public record FeedItem(string PostId, string Content, string AuthorId, string Au
 // --- Definizione degli Endpoint ---
 
 // Endpoint Protetto: GET /api/feed
-app.MapGet("/api/feed", async (ClaimsPrincipal user, IHttpClientFactory httpFactory) =>
+app.MapGet("/api/feed", static async (ClaimsPrincipal user, IHttpClientFactory httpFactory) =>
 {
     // TODO: Implementare la logica di aggregazione del feed.
     // 1. Usa httpFactory per creare un client per "PostService" e uno per "UserService".
@@ -84,9 +84,12 @@ app.MapGet("/api/feed", async (ClaimsPrincipal user, IHttpClientFactory httpFact
     //    (Suggerimento: `posts.Select(...).Distinct()`).
     // 4. Per ogni ID autore unico, chiama l'endpoint GET /api/users/{userId} del UserService per ottenere il profilo.
     //    Salva i profili recuperati in un `Dictionary<string, UserProfile>` per un accesso efficiente.
-    // 5. Itera sulla lista di post originali. Per ogni post, usa il dizionario dei profili per trovare l'username dell'autore.
-    // 6. Crea un nuovo oggetto `FeedItem` per ogni post, combinando i dati del post con l'username dell'autore.
-    // 7. Restituisci la lista finale di `FeedItem` con `Results.Ok()`.
+            }).RequireAuthorization();
+
+            app.Run();
+        }
+    }
+}
 
     return Results.Ok(new List<object>()); // Placeholder
 
