@@ -2,64 +2,95 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
-using System.Text.Json.Serialization;
+using System.Security.Claims;
 
-// --- CONFIGURAZIONE (GIÀ PRONTA) ---
 var builder = WebApplication.CreateBuilder(args);
-builder.Services.AddCors();
-var firebaseCredentialPath = builder.Configuration["Firebase:CredentialPath"]!;
-var projectId = builder.Configuration["Firebase:ProjectId"]!;
-FirebaseApp.Create(new AppOptions() { Credential = GoogleCredential.FromFile(firebaseCredentialPath) });
+
+// --- Configurazione Iniziale ---
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins("http://localhost:8080")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
+// --- Configurazione di Firebase (solo per validazione token) ---
+FirebaseApp.Create(new AppOptions()
+{
+    Credential = GoogleCredential.FromFile("firebase-credentials.json")
+});
+
+// --- Configurazione dell'Autenticazione JWT ---
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
-        options.Authority = $"https://securetoken.google.com/{projectId}";
+        options.Authority = "https://securetoken.google.com/microfeedlab";
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = $"https://securetoken.google.com/{projectId}",
+            ValidIssuer = "https://securetoken.google.com/microfeedlab",
             ValidateAudience = true,
-            ValidAudience = projectId,
+            ValidAudience = "microfeedlab",
             ValidateLifetime = true
         };
     });
 builder.Services.AddAuthorization();
-builder.Services.AddHttpClient("UserService", client => client.BaseAddress = new Uri(builder.Configuration["Services:UserUrl"]!));
-builder.Services.AddHttpClient("PostService", client => client.BaseAddress = new Uri(builder.Configuration["Services:PostUrl"]!));
+
+// --- Configurazione di HttpClientFactory per la comunicazione tra servizi ---
+// Questi indirizzi verranno risolti da Docker Compose.
+// Per il testing locale, andranno temporaneamente modificati.
+builder.Services.AddHttpClient("PostService", client => { client.BaseAddress = new Uri("http://postservice:8080"); });
+builder.Services.AddHttpClient("UserService", client => { client.BaseAddress = new Uri("http://userservice:8080"); });
+
+
 var app = builder.Build();
-app.UseCors(policy => policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+
+// --- Middleware Pipeline ---
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwagger();
+    app.UseSwaggerUI();
+}
+app.UseHttpsRedirection();
+app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
-public record Post([property: JsonPropertyName("id")] string Id, [property: JsonPropertyName("authorId")] string AuthorId, [property: JsonPropertyName("content")] string Content);
-public record UserProfile([property: JsonPropertyName("username")] string Username);
+
+// --- Definizione dei Modelli ---
+// Questi record devono rispecchiare i modelli degli altri servizi
+public record Post(string Id, string Content, string AuthorId, DateTime CreatedAt);
+public record UserProfile(string Username, string Bio);
+
+// Questo è il modello che il nostro servizio produrrà
 public record FeedItem(string PostId, string Content, string AuthorId, string AuthorUsername);
 
-// --- ENDPOINT DA IMPLEMENTARE ---
-app.MapGet("/api/feed", async (IHttpClientFactory clientFactory) =>
+
+// --- Definizione degli Endpoint ---
+
+// Endpoint Protetto: GET /api/feed
+app.MapGet("/api/feed", async (ClaimsPrincipal user, IHttpClientFactory httpFactory) =>
 {
-    var postClient = clientFactory.CreateClient("PostService");
-    var userClient = clientFactory.CreateClient("UserService");
+    // TODO: Implementare la logica di aggregazione del feed.
+    // 1. Usa httpFactory per creare un client per "PostService" e uno per "UserService".
+    // 2. Chiama l'endpoint GET /api/posts/latest del PostService per ottenere gli ultimi post.
+    //    (Suggerimento: usa `GetFromJsonAsync<List<Post>>`).
+    //    Gestisci il caso in cui non ci siano post.
+    // 3. Dalla lista di post, estrai tutti gli ID degli autori (`AuthorId`) in una lista, assicurandoti che siano unici.
+    //    (Suggerimento: `posts.Select(...).Distinct()`).
+    // 4. Per ogni ID autore unico, chiama l'endpoint GET /api/users/{userId} del UserService per ottenere il profilo.
+    //    Salva i profili recuperati in un `Dictionary<string, UserProfile>` per un accesso efficiente.
+    // 5. Itera sulla lista di post originali. Per ogni post, usa il dizionario dei profili per trovare l'username dell'autore.
+    // 6. Crea un nuovo oggetto `FeedItem` per ogni post, combinando i dati del post con l'username dell'autore.
+    // 7. Restituisci la lista finale di `FeedItem` con `Results.Ok()`.
 
-    // TODO: Implementare la logica di aggregazione
-    // 1. Chiamare PostService per ottenere gli ultimi post
-    //    `var posts = await postClient.GetFromJsonAsync<List<Post>>("/api/posts/latest");`
-    //    Gestire il caso in cui `posts` sia nullo o vuoto.
-
-    // 2. Per ogni post, chiamare UserService per ottenere il profilo dell'autore.
-    //    Usare un approccio parallelo per efficienza con `Task.WhenAll`.
-    //    `var feedTasks = posts.Select(async post => { ... });`
-
-    // 3. Dentro il .Select:
-    //    a. Chiamare `await userClient.GetFromJsonAsync<UserProfile>($"/api/users/{post.AuthorId}")`
-    //    b. Usare un try-catch per gestire il caso in cui un utente non esista più.
-    //    c. Creare e restituire un nuovo `FeedItem` con i dati combinati.
-
-    // 4. Eseguire tutti i task: `var feedItems = await Task.WhenAll(feedTasks);`
-
-    // 5. Restituire `Results.Ok(feedItems)`.
-
-    return Results.Ok("TODO: Implementare GET /api/feed");
+    return Results.Ok(new List<object>()); // Placeholder
 
 }).RequireAuthorization();
 
 app.Run();
+

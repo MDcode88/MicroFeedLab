@@ -1,0 +1,47 @@
+version: "3.8"
+
+services:
+  # Servizio per la gestione degli utenti
+  userservice:
+    build:
+      context: ./UserService
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    volumes:
+      # Monta il file delle credenziali di Firebase in sola lettura
+      - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+
+  # Servizio per la gestione dei post
+  postservice:
+    build:
+      context: ./PostService
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+
+  # Servizio per l'aggregazione del feed
+  feedservice:
+    build:
+      context: ./FeedService
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8080"
+    volumes:
+      - ./firebase-credentials.json:/app/firebase-credentials.json:ro
+    # Questo servizio dipende dagli altri due per avviarsi correttamente
+    depends_on:
+      - userservice
+      - postservice
+
+  # Servizio per il Frontend Blazor servito da Nginx
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80" # Nginx gira sulla porta 80 nel container
+    depends_on:
+      - feedservice

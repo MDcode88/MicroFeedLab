@@ -1,194 +1,143 @@
 @page "/"
 @inject IJSRuntime JSRuntime
+@inject IHttpClientFactory HttpClientFactory
 @using System.Net.Http.Headers
 @using System.Net.Http.Json
 
 <h1>MicroFeed</h1>
 
+@* Questa è la logica di base per la visualizzazione:
+    - Mostra "Inizializzazione..." al primo caricamento.
+    - Se l'utente NON è loggato, mostra la sezione di Login.
+    - Se l'utente È loggato, mostra le sezioni Profilo, Nuovo Post e Feed.
+*@
+
 @if (isInitializing)
 {
-    <p><em>Caricamento...</em></p>
+    <p><em>Inizializzazione in corso...</em></p>
 }
 else if (isLoggedIn)
 {
     <div>
         <p>Benvenuto! <button class="btn btn-sm btn-danger" @onclick="HandleSignOut">Logout</button></p>
-        <hr />
-        <ProfileSection />
-        <hr />
-        <CreatePostSection />
-        <hr />
-        <FeedSection />
+        <hr/>
+        @ProfileSection
+        <hr/>
+        @CreatePostSection
+        <hr/>
+        @FeedSection
     </div>
 }
 else
 {
-    <LoginSection />
+    @LoginSection
 }
 
 @code {
-    // TODO: GRUPPO 4 - Questo file contiene tutta la logica del frontend.
-    // Il vostro compito è analizzarlo, completare le parti mancanti e potenzialmente
-    // suddividerlo in componenti Razor separati se il tempo lo permette.
-
+    // --- Stato del componente ---
     private bool isInitializing = true;
     private bool isLoggedIn = false;
+    private HttpClient? _apiClient;
 
-    // --- SEZIONE LOGIN ---
+    // --- Variabili per il binding dei dati dell'UI ---
     private string loginEmail = "";
     private string loginPassword = "";
     private string loginError = "";
-
-    // --- SEZIONE PROFILO ---
     private string profileUsername = "";
     private string profileBio = "";
     private string profileMessage = "";
-
-    // --- SEZIONE POST ---
     private string newPostContent = "";
     private string postMessage = "";
-
-    // --- SEZIONE FEED ---
     private List<FeedItem> feedItems = new();
     private string feedError = "";
 
-    // Modelli di dati
+    // --- Modelli per la comunicazione con le API ---
     public record UserProfile(string Username, string Bio);
     public record NewPostRequest(string Content);
     public record FeedItem(string PostId, string Content, string AuthorId, string AuthorUsername);
+    public class LoginResult { public bool success { get; set; } public string? message { get; set; } }
 
+    // --- Metodi del ciclo di vita e gestione eventi ---
+
+    protected override async Task OnInitializedAsync()
+    {
+        // TODO: Inizializzare `_apiClient` usando `HttpClientFactory.CreateClient()`.
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
         {
-            var initialized = await JSRuntime.InvokeAsync<bool>("initializeFirebase");
-            if (initialized)
-            {
-                var token = await JSRuntime.InvokeAsync<string>("getJwtToken");
-                isLoggedIn = !string.IsNullOrEmpty(token);
-            }
-            isInitializing = false;
+            // TODO:
+            // 1. Chiamare la funzione JS `initializeFirebase` tramite JSRuntime.
+            // 2. Se l'inizializzazione ha successo:
+            //    a. Chiamare `GetJwtAndConfigureClientAsync()` per ottenere il token.
+            //    b. Impostare `isLoggedIn` in base alla presenza del token.
+            //    c. Se l'utente è loggato, chiamare `LoadFeed()` e `LoadProfile()`.
+            // 3. Impostare `isInitializing` a `false`.
+            // 4. Chiamare `StateHasChanged()` per aggiornare l'interfaccia.
+            
+            isInitializing = false; // Rimuovi questa riga quando implementi la logica
             StateHasChanged();
         }
     }
 
-    private async Task HandleSignUp()
+    private async Task<string?> GetJwtAndConfigureClientAsync()
     {
-        var result = await JSRuntime.InvokeAsync<LoginResult>("signUp", loginEmail, loginPassword);
-        if (result.success)
-        {
-            await HandleSignIn();
-        }
-        else
-        {
-            loginError = result.message;
-        }
+        // TODO:
+        // 1. Chiamare la funzione JS `getJwtToken` per recuperare il token.
+        // 2. Se il token esiste e `_apiClient` non è nullo:
+        //    a. Impostare l'header di autorizzazione `Bearer` su `_apiClient`.
+        //    b. Stampare il token in console (utile per gli altri gruppi!).
+        // 3. Restituire il token.
+        return null; // Placeholder
+    }
+
+    // --- Metodi per l'Autenticazione (chiamano JS) ---
+
+    private async Task HandleSignUpAndSignIn()
+    {
+        // TODO: Chiamare la funzione JS `signUp`. Se ha successo, chiamare `HandleSignIn()`. Altrimenti, mostrare l'errore.
     }
 
     private async Task HandleSignIn()
     {
-        var result = await JSRuntime.InvokeAsync<LoginResult>("signIn", loginEmail, loginPassword);
-        if (result.success)
-        {
-            isLoggedIn = true;
-            loginError = "";
-            await LoadFeed(); // Carica il feed dopo il login
-        }
-        else
-        {
-            isLoggedIn = false;
-            loginError = result.message;
-        }
+        // TODO: Chiamare la funzione JS `signIn`. Se ha successo, aggiornare lo stato (isLoggedIn, ecc.) e caricare i dati. Altrimenti, mostrare l'errore.
     }
+
+
 
     private async Task HandleSignOut()
     {
-        await JSRuntime.InvokeVoidAsync("signOut");
-        isLoggedIn = false;
+        // TODO: Chiamare la funzione JS `signOut`, impostare `isLoggedIn` a false e pulire l'header di autorizzazione da `_apiClient`.
     }
+    
+    // --- Metodi per le Chiamate API (usano HttpClient) ---
 
-    // TODO: GRUPPO 4 - Implementare i metodi per interagire con le API backend
     private async Task LoadProfile()
     {
-        // 1. Ottenere il token con `getJwtToken`
-        // 2. Creare un HttpClient, aggiungere il token come header `Authorization: Bearer <token>`
-        // 3. Fare una chiamata GET a `/api/users/me` del UserService
-        // 4. Popolare `profileUsername` e `profileBio` con la risposta
-        profileMessage = "TODO: Caricare il profilo utente da UserService";
+        // TODO: Fare una chiamata GET a `http://localhost:8081/api/users/me` per caricare il profilo e aggiornare `profileUsername` e `profileBio`. Gestire eventuali errori.
     }
 
     private async Task SaveProfile()
     {
-        // 1. Ottenere il token
-        // 2. Creare HttpClient con token
-        // 3. Fare una chiamata POST a `/api/users/me` con un oggetto UserProfile
-        profileMessage = "TODO: Salvare il profilo utente su UserService";
+        // TODO: Fare una chiamata POST a `http://localhost:8081/api/users/me` per salvare il profilo.
     }
 
     private async Task CreatePost()
     {
-        // Logica simile a SaveProfile, ma chiamata POST a `/api/posts` del PostService
-        postMessage = "TODO: Creare un nuovo post chiamando PostService";
+        // TODO: Fare una chiamata POST a `http://localhost:8082/api/posts` per creare un nuovo post. Dopo la creazione, ricaricare il feed chiamando `LoadFeed()`.
     }
 
     private async Task LoadFeed()
     {
-        // Logica simile, ma chiamata GET a `/api/feed` del FeedService
-        feedError = "TODO: Caricare il feed da FeedService";
+        // TODO: Fare una chiamata GET a `http://localhost:8083/api/feed` per caricare il feed e popolare la lista `feedItems`.
     }
 
-    // --- Render Fragments per dividere visivamente il codice ---
-
-    RenderFragment LoginSection =>@<div class="card p-3">
-    <h3>Login / Registrazione</h3>
-    <input class="form-control mb-2" @bind="loginEmail" placeholder="Email" />
-    <input type="password" class="form-control mb-2" @bind="loginPassword" placeholder="Password" />
-    <button class="btn btn-primary" @onclick="HandleSignIn">Login</button>
-    <button class="btn btn-secondary mt-2" @onclick="HandleSignUp">Registrati</button>
-@if (!string.IsNullOrEmpty(loginError)) {
-    <p class="text-danger mt-2">@loginError</p>
-    }
-</div>;
-
-RenderFragment ProfileSection =>@<div class="card p-3 mb-3">
-    <h4>Il mio profilo</h4>
-    <input class="form-control mb-2" @bind="profileUsername" placeholder="Username" />
-<textarea class="form-control mb-2" @bind="profileBio" placeholder="La tua bio"></textarea>
-    <button class="btn btn-info" @onclick="SaveProfile">Salva Profilo</button>
-    <button class="btn btn-light mt-2" @onclick="LoadProfile">Carica Profilo</button>
-@if(!string.IsNullOrEmpty(profileMessage)) {
-    <p class="text-success mt-2">@profileMessage</p>
-    }
-</div>;
-
-RenderFragment CreatePostSection =>@<div class="card p-3 mb-3">
-    <h4>Nuovo Post</h4>
-<textarea class="form-control mb-2" @bind="newPostContent" placeholder="A cosa stai pensando?"></textarea>
-    <button class="btn btn-success" @onclick="CreatePost">Pubblica</button>
-@if(!string.IsNullOrEmpty(postMessage)) {
-    <p class="text-success mt-2">@postMessage</p>
-    }
-</div>;
-
-RenderFragment FeedSection =>@<div class="card p-3">
-    <h4>Feed Principale</h4>
-@if(!string.IsNullOrEmpty(feedError)) {
-    <p class="text-danger">@feedError</p>
-    }
-@foreach(var item in feedItems)
-    {
-    <div class="border p-2 my-2">
-        <strong>@@@item.AuthorUsername</strong>
-        <p>@item.Content</p>
-    </div>
-    }
-</div>;
-
-public class LoginResult
-    {
-        public bool success { get; set; }
-        public string? userId { get; set; }
-        public string? message { get; set; }
-    }
+    // --- Render Fragments: pezzi di UI riutilizzabili ---
+    // Questi sono già completi e non richiedono modifiche.
+    RenderFragment LoginSection =>@<div class="card p-3"><h3>Login / Registrazione</h3><input class="form-control mb-2" @bind="loginEmail" placeholder="Email" /><input type="password" class="form-control mb-2" @bind="loginPassword" placeholder="Password" /><button class="btn btn-primary" @onclick="HandleSignIn">Login</button><button class="btn btn-secondary mt-2" @onclick="HandleSignUpAndSignIn">Registrati</button>@if (!string.IsNullOrEmpty(loginError)) { <p class="text-danger mt-2">@loginError</p> }</div>;
+    RenderFragment ProfileSection =>@<div class="card p-3 mb-3"><h4>Il mio profilo</h4><input class="form-control mb-2" @bind="profileUsername" placeholder="Username" /><textarea class="form-control mb-2" @bind="profileBio" placeholder="La tua bio"></textarea><button class="btn btn-info" @onclick="SaveProfile">Salva Profilo</button>@if(!string.IsNullOrEmpty(profileMessage)) { <p class="text-success mt-2">@profileMessage</p> }</div>;
+    RenderFragment CreatePostSection =>@<div class="card p-3 mb-3"><h4>Nuovo Post</h4><textarea class="form-control mb-2" @bind="newPostContent" placeholder="A cosa stai pensando?"></textarea><button class="btn btn-success" @onclick="CreatePost">Pubblica</button>@if(!string.IsNullOrEmpty(postMessage)) { <p class="text-success mt-2">@postMessage</p> }</div>;
+    RenderFragment FeedSection =>@<div class="card p-3"><h4>Feed Principale <button class="btn btn-sm btn-light" @onclick="LoadFeed">🔄</button></h4>@if(!string.IsNullOrEmpty(feedError)) { <p class="text-danger">@feedError</p> } else if (!feedItems.Any()) { <p>Nessun post da mostrare. Scrivine uno!</p>} @foreach(var item in feedItems) {<div class="border p-2 my-2"><strong>@@@item.AuthorUsername</strong><p class="mb-0">@item.Content</p></div>}</div>;
 }
