@@ -27,8 +27,9 @@ builder.Services.AddCors(options =>
 // --- Configurazione di Firebase ---
 
 // Inizializza l'SDK di Firebase Admin usando le credenziali.
-var firebaseCredential = GoogleCredential.FromFile("firebase-credentials.json");
-FirebaseApp.Create(new AppOptions() { Credential = firebaseCredential });
+
+var firebaseCredential = GoogleCredential.FromFile(Path.Combine(AppContext.BaseDirectory, "firebase-credentials.json"));
+
 
 // Crea un'istanza del client Firestore e la rende disponibile tramite DI.
 builder.Services.AddSingleton(new FirestoreDbBuilder
@@ -69,10 +70,6 @@ app.UseCors(); // Applica la policy CORS
 app.UseAuthentication(); // Prima Autenticazione...
 app.UseAuthorization();  // ...poi Autorizzazione
 
-// --- Definizione dei Modelli ---
-
-public record UserProfile(string Username, string Bio);
-
 // --- Definizione degli Endpoint ---
 
 var usersGroup = app.MapGroup("/api/users");
@@ -80,36 +77,67 @@ var usersGroup = app.MapGroup("/api/users");
 // Endpoint Pubblico: GET /api/users/{userId}
 usersGroup.MapGet("/{userId}", async (string userId, FirestoreDb db) =>
 {
-    // TODO: Implementare la logica per recuperare un profilo utente dal database.
     // 1. Crea un riferimento al documento dell'utente nella collezione "users".
-    // 2. Recupera uno snapshot del documento.
-    // 3. Se lo snapshot non esiste, restituisci Results.NotFound().
-    // 4. Se esiste, convertilo in un oggetto UserProfile e restituisci Results.Ok().
+    var userDocRef = db.Collection("users").Document(userId);
 
-    return Results.NoContent(); // Placeholder
+    // 2. Recupera uno snapshot del documento.
+    var snapshot = await userDocRef.GetSnapshotAsync();
+
+    // 3. Se lo snapshot non esiste, restituisci Results.NotFound().
+    if (!snapshot.Exists)
+    {
+        return Results.NotFound(new { Messaggio = "Profilo utente non trovato." });
+    }
+
+    // 4. Se esiste, convertilo in un oggetto UserProfile e restituisci Results.Ok().
+    var userProfile = snapshot.ConvertTo<UserProfile>();
+    return Results.Ok(userProfile);
 });
 
 // Endpoint Protetto: GET /api/users/me
 usersGroup.MapGet("/me", async (ClaimsPrincipal user, FirestoreDb db) =>
 {
-    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
-    // TODO: Implementare la logica per recuperare il PROPRIO profilo utente.
-    // La logica è identica all'endpoint precedente, ma usa lo `userId` preso dal token.
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
 
-    return Results.Ok(new { Message = "Endpoint /me da implementare", UserId = userId }); // Placeholder
+    var userDocRef = db.Collection("users").Document(userId);
+    var snapshot = await userDocRef.GetSnapshotAsync();
+
+    if (!snapshot.Exists)
+    {
+        return Results.NotFound(new { Messaggio = "Il tuo profilo utente non è stato ancora creato." });
+    }
+
+    var userProfile = snapshot.ConvertTo<UserProfile>();
+    return Results.Ok(userProfile);
+
 }).RequireAuthorization();
 
 // Endpoint Protetto: POST /api/users/me
 usersGroup.MapPost("/me", async (UserProfile profile, ClaimsPrincipal user, FirestoreDb db) =>
 {
-    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier)!;
-    // TODO: Implementare la logica per creare/aggiornare il profilo.
+    var userId = user.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (string.IsNullOrEmpty(userId))
+    {
+        return Results.Unauthorized();
+    }
+    
     // 1. Crea un riferimento al documento dell'utente.
+    var userDocRef = db.Collection("users").Document(userId);
+    
     // 2. Usa il metodo `SetAsync` con `SetOptions.MergeAll` per scrivere i dati.
+    // Questo crea il documento se non esiste o aggiorna i campi specificati se esiste.
+    await userDocRef.SetAsync(profile, SetOptions.MergeAll);
+    
     // 3. Restituisci Results.Ok().
+    return Results.Ok(profile);
 
-    return Results.Ok(new { Message = "Endpoint POST /me da implementare", UserId = userId, ReceivedProfile = profile }); // Placeholder
 }).RequireAuthorization();
 
 app.Run();
 
+// --- Definizione dei Modelli (SPOSTATA ALLA FINE) ---
+public record UserProfile(string Username, string Bio);
